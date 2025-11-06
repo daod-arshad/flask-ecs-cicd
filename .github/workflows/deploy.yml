@@ -2,30 +2,60 @@ name: Deploy to AWS ECS
 on:
   push:
     branches: [main]
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
       id-token: write   # needed for OIDC
       contents: read
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::156041430350:role/GithubRole
           aws-region: us-east-1
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
+
       - name: Build and Push Docker image to ECR
         run: |
           docker buildx build \
             --platform linux/amd64 \
             -t ${{ vars.ECR_REPO }}:stable \
             --push .
+
+      - name: Register new ECS Task Definition
+        run: |
+          aws ecs register-task-definition \
+            --family ${{ vars.ECS_TASK_FAMILY }} \
+            --execution-role-arn arn:aws:iam::156041430350:role/ecsTaskExecutionRole \
+            --network-mode awsvpc \
+            --requires-compatibilities FARGATE \
+            --cpu "256" \
+            --memory "512" \
+            --container-definitions '[
+              {
+                "name": "app",
+                "image": "${{ vars.ECR_REPO }}:stable",
+                "essential": true,
+                "portMappings": [
+                  {
+                    "containerPort": 80,
+                    "protocol": "tcp"
+                  }
+                ]
+              }
+            ]'
+
       - name: Force ECS service to redeploy
         run: |
           aws ecs update-service \
