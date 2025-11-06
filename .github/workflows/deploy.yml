@@ -36,7 +36,7 @@ jobs:
       - name: Register new ECS Task Definition
         run: |
           aws ecs register-task-definition \
-            --family ${{ vars.ECS_TASK_FAMILY }} \
+            --family hehehe \
             --execution-role-arn arn:aws:iam::156041430350:role/ecsTaskExecutionRole \
             --network-mode awsvpc \
             --requires-compatibilities FARGATE \
